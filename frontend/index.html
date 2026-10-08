@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<meta name="theme-color" content="#14161A" />
+<title>Rex Control</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ---- Design tokens -----------------------------------------------
+     base    #14161A   panel   #1E2128   line    #2B2F38
+     glow    #7CF5D4   alert   #FF6B5B
+     text    #F2F4F3   muted   #8B93A1
+     One family (Space Grotesk), weight does the differentiating.
+     Hero element: the joystick ring, which breathes gently while
+     connected — everything else stays quiet around it.
+  --------------------------------------------------------------------*/
+  :root{
+    --base:#14161A; --panel:#1E2128; --line:#2B2F38;
+    --glow:#7CF5D4; --glow-dim:#4FA98C; --alert:#FF6B5B;
+    --text:#F2F4F3; --muted:#8B93A1;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:var(--base); color:var(--text);
+    font-family:"Space Grotesk", system-ui, sans-serif;
+    overscroll-behavior:none; user-select:none;
+    display:flex; flex-direction:column;
+    min-height:100dvh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:20px 22px 14px;
+  }
+  .who{ display:flex; flex-direction:column; gap:4px; }
+  .who .name{ font-size:22px; font-weight:700; letter-spacing:-0.01em; }
+  .who .link{
+    display:flex; align-items:center; gap:7px;
+    font-size:13px; color:var(--muted); font-weight:500;
+  }
+  .dot{
+    width:8px; height:8px; border-radius:50%;
+    background:var(--glow);
+    box-shadow:0 0 0 0 rgba(124,245,212,0.5);
+    animation:pulse-dot 2.2s ease-out infinite;
+  }
+  .dot.offline{ background:var(--alert); animation:none; box-shadow:none; }
+  @keyframes pulse-dot{
+    0%{ box-shadow:0 0 0 0 rgba(124,245,212,0.45); }
+    70%{ box-shadow:0 0 0 8px rgba(124,245,212,0); }
+    100%{ box-shadow:0 0 0 0 rgba(124,245,212,0); }
+  }
+  .battery{
+    font-size:13px; color:var(--muted); font-weight:500;
+    display:flex; align-items:center; gap:6px;
+  }
+  .battery b{ color:var(--text); font-weight:600; }
+
+  main{
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    padding:10px 20px 6px; gap:14px;
+  }
+
+  .pad-wrap{
+    position:relative; width:min(72vw, 300px); aspect-ratio:1;
+  }
+  .pad-ring{
+    position:absolute; inset:0; border-radius:50%;
+    border:1.5px solid var(--line);
+    background:
+      radial-gradient(circle at 50% 50%, rgba(124,245,212,0.07), transparent 70%);
+  }
+  .pad-ring.active{
+    border-color:var(--glow-dim);
+    animation:breathe 1.6s ease-in-out infinite;
+  }
+  @keyframes breathe{
+    0%,100%{ box-shadow:0 0 22px -4px rgba(124,245,212,0.15); }
+    50%{ box-shadow:0 0 34px -2px rgba(124,245,212,0.32); }
+  }
+  .pad-crosshair{
+    position:absolute; inset:0;
+  }
+  .pad-crosshair::before, .pad-crosshair::after{
+    content:""; position:absolute; background:var(--line);
+  }
+  .pad-crosshair::before{ left:50%; top:14%; bottom:14%; width:1px; transform:translateX(-50%); }
+  .pad-crosshair::after{ top:50%; left:14%; right:14%; height:1px; transform:translateY(-50%); }
+
+  .stick{
+    position:absolute; width:76px; height:76px; border-radius:50%;
+    left:50%; top:50%; transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%, #9BFCE3, var(--glow) 60%, var(--glow-dim));
+    box-shadow:0 4px 18px -2px rgba(124,245,212,0.55), inset 0 -6px 10px rgba(0,0,0,0.18);
+    touch-action:none;
+  }
+
+  .hint{ font-size:13px; color:var(--muted); font-weight:500; }
+
+  .actions{
+    display:grid; grid-template-columns:repeat(4, 1fr);
+    gap:10px; padding:16px 18px calc(20px + env(safe-area-inset-bottom));
+  }
+  .actbtn{
+    border:1px solid var(--line); background:var(--panel);
+    color:var(--text); font-family:inherit; font-weight:600; font-size:14px;
+    padding:14px 6px; border-radius:14px; text-align:center;
+    transition:transform .08s ease, border-color .15s ease;
+  }
+  .actbtn:active{ transform:scale(0.94); border-color:var(--glow-dim); }
+  .actbtn.stop{
+    background:rgba(255,107,91,0.1); border-color:rgba(255,107,91,0.4);
+    color:var(--alert);
+  }
+  .actbtn.stop:active{ border-color:var(--alert); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="who">
+    <div class="name" id="robotName">Rex</div>
+    <div class="link"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></div>
+  </div>
+  <div class="battery">🔋 <b id="battery">--</b>%</div>
+</header>
+
+<main>
+  <div class="pad-wrap">
+    <div class="pad-ring" id="padRing"></div>
+    <div class="pad-crosshair"></div>
+    <div class="stick" id="stick"></div>
+  </div>
+  <div class="hint">drag to move · release to stop</div>
+</main>
+
+<div class="actions">
+  <button class="actbtn" data-action="sit">Sit</button>
+  <button class="actbtn" data-action="speak">Speak</button>
+  <button class="actbtn" data-action="dance">Dance</button>
+  <button class="actbtn stop" id="stopBtn">Stop</button>
+</div>
+
+<script>
+const API = ""; // same-origin; set to "http://<tailscale-ip>:5000" if serving the page separately
+
+const stick = document.getElementById("stick");
+const padWrap = document.querySelector(".pad-wrap");
+const padRing = document.getElementById("padRing");
+const connDot = document.getElementById("connDot");
+const connText = document.getElementById("connText");
+const battery = document.getElementById("battery");
+const robotName = document.getElementById("robotName");
+
+let dragging = false;
+let center = {x:0, y:0};
+let radius = 0;
+let sendTimer = null;
+let lastVec = {x:0, y:0};
+
+function layout(){
+  const r = padWrap.getBoundingClientRect();
+  center = {x: r.left + r.width/2, y: r.top + r.height/2};
+  radius = r.width/2 - 38; // keep stick inside the ring
+}
+window.addEventListener("resize", layout);
+layout();
+
+function setStick(dx, dy){
+  stick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+}
+
+function startSending(){
+  if (sendTimer) return;
+  sendTimer = setInterval(() => {
+    fetch(`${API}/api/move`, {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({x:lastVec.x, y:lastVec.y})
+    }).catch(()=>{});
+  }, 100);
+}
+function stopSending(){
+  clearInterval(sendTimer); sendTimer = null;
+  fetch(`${API}/api/stop`, {method:"POST"}).catch(()=>{});
+}
+
+function pointerDown(e){
+  dragging = true;
+  padRing.classList.add("active");
+  layout();
+  startSending();
+  pointerMove(e);
+}
+function pointerMove(e){
+  if (!dragging) return;
+  const p = e.touches ? e.touches[0] : e;
+  let dx = p.clientX - center.x;
+  let dy = p.clientY - center.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist > radius){ dx = dx/dist*radius; dy = dy/dist*radius; }
+  setStick(dx, dy);
+  // normalize to -1..1, forward = up (negative dy)
+  lastVec = { x: dx/radius, y: -dy/radius };
+}
+function pointerUp(){
+  if (!dragging) return;
+  dragging = false;
+  padRing.classList.remove("active");
+  setStick(0,0);
+  lastVec = {x:0, y:0};
+  stopSending();
+}
+
+padWrap.addEventListener("mousedown", pointerDown);
+window.addEventListener("mousemove", pointerMove);
+window.addEventListener("mouseup", pointerUp);
+padWrap.addEventListener("touchstart", pointerDown, {passive:true});
+window.addEventListener("touchmove", pointerMove, {passive:true});
+window.addEventListener("touchend", pointerUp);
+
+document.getElementById("stopBtn").addEventListener("click", () => {
+  fetch(`${API}/api/stop`, {method:"POST"}).catch(()=>{});
+});
+document.querySelectorAll(".actbtn[data-action]").forEach(btn=>{
+  btn.addEventListener("click", () => {
+    fetch(`${API}/api/action/${btn.dataset.action}`, {method:"POST"}).catch(()=>{});
+  });
+});
+
+async function pollStatus(){
+  try{
+    const res = await fetch(`${API}/api/status`, {cache:"no-store"});
+    const s = await res.json();
+    connDot.classList.remove("offline");
+    connText.textContent = "connected";
+    battery.textContent = s.battery_pct ?? "--";
+    if (s.name) robotName.textContent = s.name;
+  }catch(err){
+    connDot.classList.add("offline");
+    connText.textContent = "offline";
+  }
+}
+pollStatus();
+setInterval(pollStatus, 4000);
+
+if ("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js"));
+}
+</script>
+</body>
+</html>
